@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cetak Label Alamat</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 20px 0;
+            color: #4a90e2;
+        }
+		
+        p {
+            text-align: center;
+            margin-top: -20px;
+            color: #af03ff;
+        }
+
+        .controls {
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            resize: none;
+        }
+
+        button {
+            background-color: #4a90e2;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #357abd;
+        }
+
+        .controls hr {
+            border: 0;
+            border-top: 1px solid #ddd;
+            margin: 20px 0;
+            width: 100%;
+        }
+
+        #page-selection {
+            margin-top: 10px;
+        }
+
+        #labels {
+            margin: 20px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .page {
+            width: calc(4in - 5mm);
+            height: 6in;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 0;
+            box-sizing: border-box;
+            margin-left: 5mm;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .label-container {
+            height: calc(100% / 3 - 5px);
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        .label-container:not(:last-child) {
+            border-bottom: 1px solid #ddd;
+        }
+
+        .label {
+            font-size: 10pt;
+            line-height: 1.5;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow: hidden;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cetak Label Alamat</h1>
+	<p>by: pakposkeren (lagi)</p>
+	
+    <div class="controls">
+        <h3>Data Pengirim</h3>
+        <label for="pengirim-nama">Nama:</label>
+        <input type="text" id="pengirim-nama" placeholder="Nama Pengirim">
+
+        <label for="pengirim-alamat">Alamat:</label>
+        <textarea id="pengirim-alamat" placeholder="Alamat Pengirim"></textarea>
+
+        <label for="pengirim-tlp">No Tlp:</label>
+        <input type="text" id="pengirim-tlp" placeholder="No Telepon Pengirim">
+
+        <hr>
+		<h3>Data Penerima</h3>
+        <label for="file-excel">Ambil Data Penerima (Excel):</label>
+        <input type="file" id="file-excel" accept=".xlsx, .xls">
+
+        <button onclick="loadExcel()">Proses Data</button>
+
+        <hr>
+        <h3>Opsi Cetak</h3>
+        <label>
+            <input type="radio" name="print-option" value="all" checked> Cetak Semua
+        </label>
+        <label>
+            <input type="radio" name="print-option" value="specific" style="margin-bottom:20px"> Pilih Halaman
+        </label>
+
+        <div id="page-selection" style="display: none;">
+            <label for="pages">Masukkan Nomor Halaman (pisahkan dengan koma, rentang dengan tanda strip, contoh: 1,3-5,7):</label>
+            <input type="text" id="pages" placeholder="Nomor Halaman">
+        </div>
+
+        <button onclick="printLabels()">Cetak</button>
+    </div>
+
+    <div id="labels"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        document.querySelectorAll('input[name="print-option"]').forEach(option => {
+            option.addEventListener('change', function () {
+                const pageSelection = document.getElementById('page-selection');
+                if (this.value === 'specific') {
+                    pageSelection.style.display = 'block';
+                } else {
+                    pageSelection.style.display = 'none';
+                }
+            });
+        });
+
+        function loadExcel() {
+            const fileInput = document.getElementById('file-excel');
+            const labelsContainer = document.getElementById('labels');
+
+            if (fileInput.files.length === 0) {
+                alert('Pilih file Excel terlebih dahulu!');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet);
+
+                labelsContainer.innerHTML = '';
+
+                for (let i = 0; i < rows.length; i += 3) {
+                    const page = document.createElement('div');
+                    page.classList.add('page');
+
+                    for (let j = 0; j < 3; j++) {
+                        if (i + j >= rows.length) break;
+
+                        const row = rows[i + j];
+                        const label = document.createElement('div');
+                        label.classList.add('label-container');
+
+                        const pengirimNama = document.getElementById('pengirim-nama').value;
+                        const pengirimAlamat = document.getElementById('pengirim-alamat').value;
+                        const pengirimTlp = document.getElementById('pengirim-tlp').value;
+
+                        label.innerHTML = `
+                            <div class="label">
+                                <strong>PENGIRIM:</strong><br>
+                                ${pengirimNama}<br>
+                                ${pengirimAlamat}<br>
+                                ${pengirimTlp}
+                            </div>
+                            <div class="label">
+                                <strong>PENERIMA:</strong><br>
+                                ${row.Nama || ''}<br>
+                                ${row.Alamat || ''}<br>
+                                ${row['No Tlp'] || ''}
+                            </div>
+                        `;
+
+                        page.appendChild(label);
+                    }
+
+                    labelsContainer.appendChild(page);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parsePageRanges(input) {
+            const ranges = input.split(',');
+            const pages = new Set();
+
+            ranges.forEach(range => {
+                if (range.includes('-')) {
+                    const [start, end] = range.split('-').map(Number);
+                    for (let i = start; i <= end; i++) {
+                        pages.add(i - 1); // Halaman dimulai dari 1, jadi kurangi 1
+                    }
+                } else {
+                    pages.add(Number(range) - 1); // Halaman dimulai dari 1, jadi kurangi 1
+                }
+            });
+
+            return Array.from(pages).sort((a, b) => a - b);
+        }
+
+        function printLabels() {
+            const printOption = document.querySelector('input[name="print-option"]:checked').value;
+            const labels = document.getElementById('labels').children;
+            let pagesToPrint = Array.from(labels);
+
+            if (printOption === 'specific') {
+                const pageInput = document.getElementById('pages').value;
+                if (!pageInput.trim()) {
+                    alert('Masukkan nomor halaman untuk mencetak.');
+                    return;
+                }
+
+                try {
+                    const pageNumbers = parsePageRanges(pageInput);
+                    pagesToPrint = pagesToPrint.filter((_, index) => pageNumbers.includes(index));
+
+                    if (pagesToPrint.length === 0) {
+                        alert('Nomor halaman tidak valid.');
+                        return;
+                    }
+                } catch (error) {
+                    alert('Format nomor halaman tidak valid. Gunakan format seperti 1,3-5,7.');
+                    return;
+                }
+            }
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.open();
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {
+							font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+							font-size: 10pt;
+                            margin: 0;
+                            padding: 0;
+                            display: flex;
+                            flex-wrap: wrap;
+                            justify-content: flex-start;
+                            align-items: flex-start;
+                        }
+                        .page {
+                            margin: 0;
+                            padding: 0;
+                            page-break-after: always;
+                        }
+                        .label-container:not(:last-child) {
+                            border-bottom: 1px solid #000;
+                        }
+                        .label {
+							font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+							line-height: 1.42;
+                            margin-bottom: 5px;
+                        }
+						
+                    </style>
+                </head>
+                <body>
+                    ${pagesToPrint.map(page => page.outerHTML).join('')}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        }
+    </script>
+</body>
+</html>
